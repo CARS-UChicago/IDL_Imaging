@@ -1,7 +1,7 @@
 pro make_movie, vol, min=min, max=max, wait=wait, scale=scale, index=index, $
                 start=start, stop=stop, step=step, mpeg_file=mpeg_file, $
-                jpeg_file=jpeg_file, label=label, quality=quality, color=color, $
-                file=file, buffer_size=buffer_size, window=window, $
+                jpeg_file=jpeg_file, tiff_file=tiff_file, label=label, quality=quality, $
+                color=color, file=file, buffer_size=buffer_size, window=window, $
                 abort_widget=abort_widget, status_widget=status_widget
 
 
@@ -13,7 +13,8 @@ pro make_movie, vol, min=min, max=max, wait=wait, scale=scale, index=index, $
 ;   This procedure plays a 3-D array as a movie either:
 ;       1) On the screen
 ;       2) To an MPEG file on disk
-;       2) To a series of JPEG files on disk
+;       3) To a series of JPEG files on disk
+;       4) To a series of TIFF files on disk
 ;
 ; CATEGORY:
 ;   Image display.
@@ -104,6 +105,15 @@ pro make_movie, vol, min=min, max=max, wait=wait, scale=scale, index=index, $
 ;       variable !order is used to determine whether the files are written bottom to
 ;       top or top to bottom.
 ;
+;   TIFF_FILE:
+;       The base name of an TIFF file to which the output should be written.  If
+;       this keyword is used then this procedure does not display its output on
+;       the screen but rather creates a series of TIFF files. A sequence number and
+;       the extension .tif are appended to this base name. The file names are thus
+;       of the form 'my_jpeg_name_0001.tif', 'my_jpeg_name_0002.tif', etc.  The system
+;       variable !order is used to determine whether the files are written bottom to
+;       top or top to bottom.
+;
 ;   QUALITY:
 ;       The quality factor for JPEG and MPEG files.
 ;       See the help for WRITE_JPEG for more information on using this
@@ -182,6 +192,7 @@ pro make_movie, vol, min=min, max=max, wait=wait, scale=scale, index=index, $
 ;   Nov. 24, 2001  MLR  Added the WINDOW keyword
 ;   Apr. 26, 2002  MLR  Worked around bug in MPEG_PUT, movies were upside down relative
 ;                       to on-screen and JPEG files.
+;   Jan. 9,  2004  MLR  Added TIFF_FILE keyword
 ;-
 
 if (n_elements(wait) eq 0) then wait=0
@@ -289,7 +300,13 @@ endif else begin
     jpeg_mode = 0
 endelse
 
-if ((jpeg_mode eq 0) and (mpeg_mode eq 0)) then begin
+if (n_elements(tiff_file) ne 0) then begin
+    tiff_mode = 1
+endif else begin
+    tiff_mode = 0
+endelse
+
+if ((jpeg_mode eq 0) and (tiff_mode eq 0) and (mpeg_mode eq 0)) then begin
    window, window, xsize=(ncols>100), ysize=(nrows>100)
 endif
 
@@ -312,7 +329,7 @@ for frame=start, stop, step do begin
         2: temp=vol[*,frame_index,*]
         3: temp=vol[*,*,frame_index]
     endcase
-    frame_index = frame_index+1
+    frame_index = frame_index+step
     temp = reform(temp, /overwrite)
     temp = bytscl(temp, min=min, max=max)
     if (scale ne 1) then temp = rebin(temp[0:last_col, 0:last_row], $
@@ -341,6 +358,12 @@ for frame=start, stop, step do begin
         print, str
         if (keyword_set(color)) then true=1 else true=0
         write_jpeg, jfile, temp, quality=quality, order=!order, true=true
+    endif else if (tiff_mode) then begin
+        num = string(frame+1, format='(i4.4)')
+        tfile = tiff_file + '_' + num + '.tif'
+        str = str + ' (TIFF file=' + tfile + ')'
+        print, str
+        write_tiff, tfile, temp, orientation=1-!order
     endif else begin
         tv, temp
         if (keyword_set(label)) then begin
