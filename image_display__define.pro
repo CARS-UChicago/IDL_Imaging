@@ -195,7 +195,7 @@ end
 pro image_display::display_image, noerase
 
     if n_elements(noerase) eq 0 then noerase=0
-    
+
     if (!ORDER EQ 0) then begin
         self->dc_to_ic, 0, 0, first_col, first_row, /clip
         self->dc_to_ic, self.image_window.x_size-1, $
@@ -401,12 +401,12 @@ pro image_display::event, event
         end
 
         self.widgets.MinMaxtable: begin
-    	    print, 'Type, X, Y ', event.type, event.X, event.Y
-    	    widget_control, self.widgets.MinMaxtable, get_value=value
-    	    if (event.Y eq 1) then begin
-    		self.image_window.black_level=value[0].display
-    		self.image_window.white_level=value[1].display
-        	self.image_data.display_buff = $
+            print, 'Type, X, Y ', event.type, event.X, event.Y
+            widget_control, self.widgets.MinMaxtable, get_value=value
+            if (event.Y eq 1) then begin
+            self.image_window.black_level=value[0].display
+            self.image_window.white_level=value[1].display
+            self.image_data.display_buff = $
                         ptr_new(bytscl(*self.image_data.raw_data, $
                                 min=self.image_window.black_level, $
                                 max=self.image_window.white_level, $
@@ -426,17 +426,17 @@ pro image_display::event, event
         end
 
         self.widgets.apply_color_table: begin
-            self->display_image 
+            self->display_image
         end
-;mn
+
         self.widgets.out_form: begin
-            u = fix(a2f(event.index))
             self.image_data.out_form = event.index
         end
         self.widgets.out_file: begin
-            self->write_output_file, format=self.image_data.oformats[self.image_data.out_form]
+            self->write_output_file, $
+                    format=self.image_data.oformats[self.image_data.out_form]
         end
-;mn
+
 
         else:  t = dialog_message('Unknown event')
     endcase
@@ -454,8 +454,8 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
 ;       This function initializes an object of class IMAGE_DISPLAY.  It is
 ;       not called directly, but is called indirectly when a new object of
 ;       class IMAGE_DISPLAY is created via OBJ_NEW('IMAGE_DISPLAY')
-;       
-;       The IMAGE_DISPLAY object is a GUI display which provides interactive 
+;
+;       The IMAGE_DISPLAY object is a GUI display which provides interactive
 ;       pan, zoom and scroll, live update of row and column profiles, etc.
 ;
 ; CATEGORY:
@@ -468,7 +468,7 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
 ;       Data:   A 2-D array to be displayed
 ;
 ; KEYWORD PARAMETERS:
-;       
+;
 ;
 ; OUTPUTS:
 ;       This function returns 1 to indicate that the object was successfully
@@ -481,7 +481,7 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
 ; MODIFICATION HISTORY:
 ;       Written by:     Mark Rivers (3-DEC-1998)
 ;       3-APR-1999  MLR  Fixed so that it will reform input array if it is
-;                        greater than 2-D but with some dimensions=1, 
+;                        greater than 2-D but with some dimensions=1,
 ;                        e.g. Data = intarr(100,1,100), which happens
 ;                        frequently when extracting slices from 3-D data
 ;       23-SEP-1999 MN   Added code to write JPEG file
@@ -490,6 +490,8 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
 ;       11-JUN-2001 MN   Added dropdown menu for output types (JPEG, BMP, PNG), and
 ;                        added 'title' and 'subtitle' keywords which are
 ;                        displayed in the window title
+;       17-JAN-2001 MLR  Delete line that called "a2f".  Line did nothing and a2f
+;                        is not needed.
 ;
 ;-
 
