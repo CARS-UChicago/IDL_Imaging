@@ -1,7 +1,9 @@
 pro make_movie, vol, min=min, max=max, wait=wait, scale=scale, index=index, $
                 start=start, stop=stop, step=step, mpeg_file=mpeg_file, $
                 jpeg_file=jpeg_file, label=label, quality=quality, color=color, $
-                file=file, buffer_size=buffer_size
+                file=file, buffer_size=buffer_size, window=window, $
+                abort_widget=abort_widget, status_widget=status_widget
+
 
 ;+
 ; NAME:
@@ -81,6 +83,11 @@ pro make_movie, vol, min=min, max=max, wait=wait, scale=scale, index=index, $
 ;       The default is 0., i.e. frames are diplayed as fast as possible.
 ;       This keyword has no effect if the JPEG_FILE or MPEG_FILE keywords are used.
 ;
+;   WINDOW:
+;       The window number if the movie is being displayed on the screen.  The
+;       window will be created to be exactly the right size to display the movie.
+;       The default is 0.
+;
 ;   MPEG_FILE:
 ;       The name of an MPEG file to which the output should be written.  If
 ;       this keyword is used then this procedure does not display its output on
@@ -116,6 +123,17 @@ pro make_movie, vol, min=min, max=max, wait=wait, scale=scale, index=index, $
 ;       as a label on the screen.  This is useful for determining which frames
 ;       interesting features appear in, for use later with IMAGE_DISPLAY
 ;       or other routines.
+;
+;   STATUS_WIDGET:
+;       The widget ID of a text widget used to display the status of the
+;       preprocessing operation.  If this is a valid widget ID then
+;       informational messages will be written to this widget.
+;
+;   ABORT_WIDGET
+;       The widget ID of a widget used to abort the preprocessing operation.
+;       If this is a valid widget ID then the "uvalue" of this widget will be
+;       checked periodically.  If it is 1 then this routine will clean up and
+;       return immediately.
 ;
 ; OUTPUTS:
 ;   This procedure does not return any output to IDL.  It displays images on
@@ -160,11 +178,15 @@ pro make_movie, vol, min=min, max=max, wait=wait, scale=scale, index=index, $
 ;                       Made QUALITY keyword apply to MPEG files if the IDL version
 ;                       is 5.4 or higher.
 ;   Nov. 5, 2001   MLR  Added the FILE and BUFFER_SIZE keywords.
+;   Nov. 22, 2001  MLR  Added the ABORT_WIDGET and STATUS_WIDGET keywords
+;   Nov. 24, 2001  MLR  Added the WINDOW keyword
 ;-
 
 if (n_elements(wait) eq 0) then wait=0
 if (n_elements(scale) eq 0) then scale=1
 if (n_elements(index) eq 0) then index=3
+if (n_elements(status_widget) eq 0) then status_widget = -1L
+if (n_elements(abort_widget) eq 0) then abort_widget = -1L
 
 if (keyword_set(file)) then begin
     file_mode = 1
@@ -241,10 +263,12 @@ if (scale lt -1) then begin
 endif
 
 if (n_elements(start) eq 0) then start=0
-if (n_elements(stop) eq 0) then stop=nframes
+if (n_elements(stop) eq 0) then stop=nframes-1
+stop = stop < (nframes-1)
 if (n_elements(step) eq 0) then step=1
 if (n_elements(quality) eq 0) then quality=90
 if (n_elements(order) eq 0) then order=0
+if (n_elements(window) eq 0) then window=0
 
 if (n_elements(mpeg_file) ne 0) then begin
     if (!version.release lt '5.4') then begin
@@ -263,8 +287,12 @@ endif else begin
     jpeg_mode = 0
 endelse
 
-frame_index=0
-for frame=start, stop-1, step do begin
+if ((jpeg_mode eq 0) and (mpeg_mode eq 0)) then begin
+   window, window, xsize=(ncols>100), ysize=(nrows>100)
+endif
+
+frame_index=start
+for frame=start, stop, step do begin
     if ((file_mode) and (frame_index ge buff_frames)) then begin
         vol=0   ; Free up memory
         case index of
@@ -298,13 +326,15 @@ for frame=start, stop-1, step do begin
         ; Now back to (3, ncols, nrows)
         temp = reform(temp, 3, ncols, nrows, /overwrite)
     endif
+    str = 'Frame = ' + strtrim(frame,2) + '/' + strtrim(stop,2)
     if (mpeg_mode) then begin
-        print, 'Frame = ', frame
+        print, str
         mpeg_put, mpegid, frame=frame, image=temp, order=!order
     endif else if (jpeg_mode) then begin
         num = string(frame+1, format='(i4.4)')
         jfile = jpeg_file + '_' + num + '.jpg'
-        print, 'Writing jpeg file ', jfile
+        str = str + ' (JPEG file=' + jfile + ')'
+        print, str
         if (keyword_set(color)) then true=1 else true=0
         write_jpeg, jfile, temp, quality=quality, order=!order, true=true
     endif else begin
@@ -315,11 +345,27 @@ for frame=start, stop-1, step do begin
         endif
         wait, wait
     endelse
+    if (widget_info(status_widget, /valid_id)) then $
+        widget_control, status_widget, set_value=str
+    if (widget_info(abort_widget, /valid_id)) then begin
+        event = widget_event(/nowait, abort_widget)
+        widget_control, abort_widget, get_uvalue=abort
+        if (abort) then begin
+            if (widget_info(status_widget, /valid_id)) then $
+                widget_control, status_widget, set_value='Movie aborted'
+            return
+        endif
+    endif
 endfor
 
 if (mpeg_mode) then begin
+    if (widget_info(status_widget, /valid_id)) then $
+        widget_control, status_widget, set_value='Closing MPEG file ...'
     mpeg_save, mpegid, file=mpeg_file
     mpeg_close, mpegid
 endif
+
+if (widget_info(status_widget, /valid_id)) then $
+    widget_control, status_widget, set_value='Movie complete'
 
 end
