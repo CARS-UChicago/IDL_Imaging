@@ -110,6 +110,7 @@ pro image_display::init_plot_windows
     xrange = [(x_axis(x_min) - 0.05*diff), (x_axis(x_max) + 0.05*diff)]
     diff = y_axis(y_max) - y_axis(y_min)
     yrange = [(y_axis(y_min) - 0.05*diff), (y_axis(y_max) + 0.05*diff)]
+    if (!order eq 1) then yrange=reverse(yrange)
     wset, self.row_plot_window.winid
     plot, x_axis(x_min:x_max), (*self.image_data.raw_data)(x_min:x_max, yc), $
             /nodata, $
@@ -494,6 +495,8 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
 ;                        is not needed.
 ;       27-APR-2002 MLR  Added order keywords to write_jpeg and write_png so images
 ;                        are correct side up.
+;                        Fixed bug in plotting vertical column profile if !order=1, thanks
+;                        to Peter Vontobel of Swiss Light Source.
 ;
 ;-
 
