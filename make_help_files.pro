@@ -1,4 +1,4 @@
-dest = '/net/millenia/usr/local/apache/htdocs/software/'
+dest = '/millenia/usr/local/apache/htdocs/software/'
 mk_html_help, ['make_movie.pro', $
                'image_display.pro', $
                'image_display__define.pro', $
