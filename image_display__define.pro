@@ -66,10 +66,10 @@ outfile = dialog_pickfile(filter=ffilter, file=def_out, /write, $
                           title='Select Output Image File')
 if (outfile ne '') then begin
     case oform of
-        'jpg':  write_jpeg, outfile, ta, true=3
-        'jpeg': write_jpeg, outfile, ta, true=3
-        'gif':  write_png,  outfile, buff, r, g, b
-        'png':  write_png,  outfile, buff, r, g, b
+        'jpg':  write_jpeg, outfile, ta, true=3, order=!order
+        'jpeg': write_jpeg, outfile, ta, true=3, order=!order
+        'gif':  write_png,  outfile, buff, r, g, b, order=!order
+        'png':  write_png,  outfile, buff, r, g, b, order=!order
         'bmp':  write_bmp,  outfile, ta
         else:   outfile=''
     endcase
@@ -492,6 +492,8 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
 ;                        displayed in the window title
 ;       17-JAN-2001 MLR  Delete line that called "a2f".  Line did nothing and a2f
 ;                        is not needed.
+;       27-APR-2002 MLR  Added order keywords to write_jpeg and write_png so images
+;                        are correct side up.
 ;
 ;-
 
