@@ -83,12 +83,12 @@ return
 end
 ;
 ;------------------
-pro image_display::init_plot_windows
+pro image_display::init_plot_windows, leave_mouse=leave_mouse
 
     x_mouse=self.image_window.x_size/2
     y_mouse=self.image_window.y_size/2
     wset, self.image_window.winid
-    tvcrs, x_mouse, y_mouse
+    if (not keyword_set(leave_mouse)) then tvcrs, x_mouse, y_mouse
     self->dc_to_ic, x_mouse, y_mouse, xc, yc, /clip
     self->dc_to_ic, 0, 0, x_min, y_min, /clip
     self->dc_to_ic, self.image_window.x_size-1, self.image_window.y_size-1, $
@@ -193,7 +193,7 @@ pro image_display::plot_profiles, x_mouse, y_mouse
 end
 
 
-pro image_display::display_image, noerase
+pro image_display::display_image, noerase, leave_mouse=leave_mouse
 
     if n_elements(noerase) eq 0 then noerase=0
 
@@ -233,20 +233,28 @@ pro image_display::display_image, noerase
                         nr*self.image_window.y_zoom, sample=sample)
         tv, buff, x_offset, y_offset
     endelse
-    self->init_plot_windows
+    self->init_plot_windows, leave_mouse=leave_mouse
 end
 
 
 pro image_display::scale_image, image, min=min, max=max, zoom=zoom, $
             center=center, noerase=noerase, interpolate=interpolate, $
-            replicate=replicate, xdist=xdist, ydist=ydist
+            replicate=replicate, xdist=xdist, ydist=ydist, $
+            title=title, subtitle=subtitle, leave_mouse=leave_mouse
 
+
+    size = size(image)
+    if (size[0] ne 2) then image = reform(image)
     self.image_data.x_size = n_elements(image(*,0))
     self.image_data.y_size = n_elements(image(0,*))
     self.image_data.raw_data = ptr_new(image)
 
     if (n_elements(xdist) eq 0) then xdist = findgen(self.image_data.x_size)
     if (n_elements(ydist) eq 0) then ydist = findgen(self.image_data.y_size)
+    if (n_elements(title) ne 0) then begin
+       if (n_elements(subtitle) ne 0) then title = title+':'+subtitle
+       widget_control, self.widgets.base, tlb_set_title=title
+    endif
     if (n_elements(xdist) ne self.image_data.x_size) or $
        (n_elements(ydist) ne self.image_data.y_size) then $
         t = dialog_message('Size of xdist and ydist must match size of image')
@@ -305,7 +313,7 @@ pro image_display::scale_image, image, min=min, max=max, zoom=zoom, $
     self.MinMaxtable[0].display=self.image_window.black_level
     self.MinMaxtable[1].display=self.image_window.white_level
     widget_control, self.widgets.MinMaxtable, set_value=self.MinMaxtable
-    self->display_image
+    self->display_image, leave_mouse=leave_mouse
 end
 
 
@@ -498,6 +506,10 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
 ;                        Fixed bug in plotting vertical column profile if !order=1, thanks
 ;                        to Peter Vontobel of Swiss Light Source.
 ;
+;       4-JUN-2002  MLR  Added "title" keyword to image_display::display_image
+;                        and "leave_mouse" keyword to other routines.  These
+;                        changes allow tomo_display:: to scroll though 2-D
+;                        slices in a 3-D volume quickly and easily. 
 ;-
 
     size = size(data)
