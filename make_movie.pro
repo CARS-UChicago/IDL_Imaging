@@ -180,6 +180,8 @@ pro make_movie, vol, min=min, max=max, wait=wait, scale=scale, index=index, $
 ;   Nov. 5, 2001   MLR  Added the FILE and BUFFER_SIZE keywords.
 ;   Nov. 22, 2001  MLR  Added the ABORT_WIDGET and STATUS_WIDGET keywords
 ;   Nov. 24, 2001  MLR  Added the WINDOW keyword
+;   Apr. 26, 2002  MLR  Worked around bug in MPEG_PUT, movies were upside down relative
+;                       to on-screen and JPEG files.
 ;-
 
 if (n_elements(wait) eq 0) then wait=0
@@ -329,7 +331,9 @@ for frame=start, stop, step do begin
     str = 'Frame = ' + strtrim(frame,2) + '/' + strtrim(stop,2)
     if (mpeg_mode) then begin
         print, str
-        mpeg_put, mpegid, frame=frame, image=temp, order=!order
+        ; Note, there appears to be a bug in mpeg_put, the order keyword
+        ; is the opposite of the documentation, and the behaviour of TV and WRITE_JPEG.
+        mpeg_put, mpegid, frame=frame, image=temp, order=1-!order
     endif else if (jpeg_mode) then begin
         num = string(frame+1, format='(i4.4)')
         jfile = jpeg_file + '_' + num + '.jpg'
