@@ -193,6 +193,7 @@ pro make_movie, vol, min=min, max=max, wait=wait, scale=scale, index=index, $
 ;   Apr. 26, 2002  MLR  Worked around bug in MPEG_PUT, movies were upside down relative
 ;                       to on-screen and JPEG files.
 ;   Jan. 9,  2004  MLR  Added TIFF_FILE keyword
+;   Nov. 30, 2004  MLR  Put MPEG and JPEG output through lookup table if COLOR=0.
 ;-
 
 if (n_elements(wait) eq 0) then wait=0
@@ -335,15 +336,21 @@ for frame=start, stop, step do begin
     if (scale ne 1) then temp = rebin(temp[0:last_col, 0:last_row], $
                                       ncols, nrows)
     ; The code for handling color was lifted out of the IDL procedure MPEG_PUT.
-    if (keyword_set(color)) then begin
-        ; Apply color tables and create an (ncols, 3 * nrows) array:
+    if (jpeg_mode or mpeg_mode) then begin
         tvlct, red, green, blue, /get
-        temp = [[red[temp]], [green[temp]], [blue[temp]]]
-        ; Reform to (ncols * nrows, 3) and then transpose to interleave color as
-        ; first dimension.
-        temp = transpose(reform(temp, ncols * nrows, 3, /overwrite))
-        ; Now back to (3, ncols, nrows)
-        temp = reform(temp, 3, ncols, nrows, /overwrite)
+        if (keyword_set(color)) then begin
+            ; Apply color tables and create an (ncols, 3 * nrows) array:
+
+            temp = [[red[temp]], [green[temp]], [blue[temp]]]
+            ; Reform to (ncols * nrows, 3) and then transpose to interleave color as
+            ; first dimension.
+            temp = transpose(reform(temp, ncols * nrows, 3, /overwrite))
+            ; Now back to (3, ncols, nrows)
+            temp = reform(temp, 3, ncols, nrows, /overwrite)
+        endif else begin
+            ; Not color, but put image through red lookup table for gamma and inversion
+            temp = red[temp]
+        endelse
     endif
     str = 'Frame = ' + strtrim(frame,2) + '/' + strtrim(stop,2)
     if (mpeg_mode) then begin
