@@ -1,85 +1,86 @@
 pro image_display::write_output_file, format=format
 
-oform = 'jpeg'
-if (keyword_set(format) ne 0 ) then oform = format
-oform = strlowcase(oform)
+    oform = 'jpeg'
+    if (keyword_set(format) ne 0 ) then oform = format
+    oform = strlowcase(oform)
 
-if (!ORDER EQ 0) then begin
-  self->dc_to_ic, 0, 0, first_col, first_row, /clip
-  self->dc_to_ic, self.image_window.x_size-1, self.image_window.y_size-1, $
-                  last_col, last_row, /clip
-endif else begin
-  self->dc_to_ic, 0, self.image_window.y_size-1, first_col, first_row, /clip
-  self->dc_to_ic, self.image_window.x_size-1, 0, last_col, last_row, /clip
-endelse
-if (!ORDER EQ 0) then begin
-  self->ic_to_dc, first_col, first_row, x_offset, y_offset
-  x_offset = (x_offset - self.image_window.x_zoom/2.) > 0
-  y_offset = (y_offset - self.image_window.y_zoom/2.) > 0
-endif else begin
-  self->ic_to_dc, first_col, last_row, x_offset, y_offset
-  x_offset = (x_offset - self.image_window.x_zoom/2.) > 0
-  y_offset = (y_offset - self.image_window.y_zoom/2.) > 0
-endelse
+    if (!ORDER EQ 0) then begin
+        self->dc_to_ic, 0, 0, first_col, first_row, /clip
+        self->dc_to_ic, self.image_window.x_size-1, self.image_window.y_size-1, $
+                        last_col, last_row, /clip
+    endif else begin
+      self->dc_to_ic, 0, self.image_window.y_size-1, first_col, first_row, /clip
+      self->dc_to_ic, self.image_window.x_size-1, 0, last_col, last_row, /clip
+    endelse
+    if (!ORDER EQ 0) then begin
+        self->ic_to_dc, first_col, first_row, x_offset, y_offset
+        x_offset = (x_offset - self.image_window.x_zoom/2.) > 0
+        y_offset = (y_offset - self.image_window.y_zoom/2.) > 0
+    endif else begin
+        self->ic_to_dc, first_col, last_row, x_offset, y_offset
+        x_offset = (x_offset - self.image_window.x_zoom/2.) > 0
+        y_offset = (y_offset - self.image_window.y_zoom/2.) > 0
+    endelse
 
-nc = last_col - first_col + 1
-nr = last_row - first_row + 1
-if self.image_window.zoom_mode eq 0 then sample=1 else sample=0
-wset, self.image_window.winid
-; if noerase eq 0 then erase
+    nc = last_col - first_col + 1
+    nr = last_row - first_row + 1
+    if self.image_window.zoom_mode eq 0 then sample=1 else sample=0
+    wset, self.image_window.winid
+    ; if noerase eq 0 then erase
 
-buff = rebin((*self.image_data.display_buff)(first_col:last_col, first_row:last_row), $
-             nc*self.image_window.x_zoom, nr*self.image_window.y_zoom, sample=sample)
+    buff = rebin((*self.image_data.display_buff)(first_col:last_col, first_row:last_row), $
+                  nc*self.image_window.x_zoom, nr*self.image_window.y_zoom, sample=sample)
 
-ncout = nc*self.image_window.x_zoom
-nrout = nr*self.image_window.y_zoom
-a     = fltarr(ncout,nrout)
-a     = float(buff)
-tr    = bytarr(ncout, nrout)
-tg    = bytarr(ncout, nrout)
-tb    = bytarr(ncout, nrout)
-ta    = bytarr(ncout, nrout, 3)
-tvlct, r, g, b, /get
-for i=0,ncout-1 do for j=0,nrout-1 do tr[i, j] = r[a[i,j]]
-for i=0,ncout-1 do for j=0,nrout-1 do tg[i, j] = g[a[i,j]]
-for i=0,ncout-1 do for j=0,nrout-1 do tb[i, j] = b[a[i,j]]
-ta[*,*,0]=tr
-ta[*,*,1]=tg
-ta[*,*,2]=tb
+    ncout = nc*self.image_window.x_zoom
+    nrout = nr*self.image_window.y_zoom
+    a     = fltarr(ncout,nrout)
+    a     = float(buff)
+    tr    = bytarr(ncout, nrout)
+    tg    = bytarr(ncout, nrout)
+    tb    = bytarr(ncout, nrout)
+    ta    = bytarr(ncout, nrout, 3)
+    tvlct, r, g, b, /get
+    for i=0,ncout-1 do for j=0,nrout-1 do tr[i, j] = r[a[i,j]]
+    for i=0,ncout-1 do for j=0,nrout-1 do tg[i, j] = g[a[i,j]]
+    for i=0,ncout-1 do for j=0,nrout-1 do tb[i, j] = b[a[i,j]]
+    ta[*,*,0]=tr
+    ta[*,*,1]=tg
+    ta[*,*,2]=tb
 
-outfile=''
-df     = self.image_data.handle
-; MN 13 Aug 2001
-; remove '/' characters from image name
-ino    = strpos(df,'/')
-while (ino ge 0) do begin
-  strput, df, '_', ino
-  ino = strpos(df,'/')
-endwhile
+    outfile=''
+    df     = self.image_data.handle
+    ; MN 13 Aug 2001
+    ; remove '/' characters from image name
+    ino    = strpos(df,'/')
+    while (ino ge 0) do begin
+        strput, df, '_', ino
+        ino = strpos(df,'/')
+    endwhile
 
-; force output choice of jpg,png,bmp:
-if (oform eq 'jpeg') then oform='jpg'
-if (oform eq 'gif')  then oform='png'
-ffilter =     '*.' + oform
-def_out = df + '.' + oform
-outfile = dialog_pickfile(filter=ffilter, file=def_out, /write, $
-                          title='Select Output Image File')
-if (outfile ne '') then begin
-    case oform of
-        'jpg':  write_jpeg, outfile, ta, true=3, order=!order
-        'jpeg': write_jpeg, outfile, ta, true=3, order=!order
-        'gif':  write_png,  outfile, buff, r, g, b, order=!order
-        'png':  write_png,  outfile, buff, r, g, b, order=!order
-        'bmp':  write_bmp,  outfile, ta
-        else:   outfile=''
+    ; force output choice of jpg,png,bmp,tif:
+    if (oform eq 'jpeg') then oform='jpg'
+    if (oform eq 'gif')  then oform='png'
+    if (oform eq 'tiff') then oform='tif'
+    ffilter =     '*.' + oform
+    def_out = df + '.' + oform
+    outfile = dialog_pickfile(filter=ffilter, file=def_out, /write, $
+                              title='Select Output Image File')
+    if (outfile ne '') then begin
+        case oform of
+            'jpg':  write_jpeg, outfile, ta, true=3, order=!order
+            'gif':  write_png,  outfile, buff, r, g, b, order=!order
+            'png':  write_png,  outfile, buff, r, g, b, order=!order
+            'bmp':  write_bmp,  outfile, ta
+            'tif':  write_tiff, outfile, buff, red=r, green=g, blue=b, orientation=!order
+            else:   outfile=''
+        endcase
+    endif
+    case outfile of
+        '':    print, 'no output written'
+        else:  print, 'wrote ', outfile
     endcase
-endif
-case outfile of
-    '':    print, 'no output written'
-    else:  print, 'wrote ', outfile
-endcase
 
-return
+    return
 end
 ;
 ;------------------
@@ -513,6 +514,8 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
 ;                        and "leave_mouse" keyword to other routines.  These
 ;                        changes allow tomo_display:: to scroll though 2-D
 ;                        slices in a 3-D volume quickly and easily. 
+;
+;       27-APR-2006  MLR Added "tiff" output option 
 ;-
 
     size = size(data)
@@ -572,7 +575,7 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
     self.widgets.new_color_table = widget_button(col, value='New color table')
     self.widgets.apply_color_table = widget_button(col, $
                                 value='Apply color table')
-    self.image_data.oformats = ['JPEG', 'BMP', 'PNG']
+    self.image_data.oformats = ['JPEG', 'BMP', 'PNG', 'TIF']
     self.image_data.out_form = 0
 
     ocol = widget_base(base, column=1, /align_center,/frame)
@@ -674,7 +677,7 @@ pro image_display__define, data, xsize=xsize, ysize=ysize
     image_data = {image_display_image_data, $
         raw_data: ptr_new(), $
         display_buff: ptr_new(), $
-        oformats: strarr(3), $
+        oformats: strarr(4), $
         handle: '', $
         out_form: 0L, $
         x_size: 0L, $
