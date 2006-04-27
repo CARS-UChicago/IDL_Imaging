@@ -397,6 +397,9 @@ pro image_display::event, event
                             self.image_window.y_zoom = $
                                 self.image_window.y_zoom*2
                         end
+                        else: begin
+                            print, 'Unexpected mouse event = ', event.press
+                        end
                     endcase
                     self->display_image
                 end
