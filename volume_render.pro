@@ -31,7 +31,7 @@
 ;   Written by:     Mark Rivers (12-MAR-1999)
 ;                   This procedure was based on the d_volrendr.pro from the
 ;                   IDL demos, generalized and with additional features
-;                       
+;
 ;-
 
 ;----------------------------------------------------------------------------
@@ -120,6 +120,7 @@ case quality of
 ;       print, systime(1) - tic, ' Seconds'
         end
     endcase
+
 ;
 ;Ignore any accumulated floating underflow errors.  (They are benign).
 ;Display any other accumulated math errors.
@@ -401,6 +402,17 @@ case uval of
     'RENDER' : begin
         d_volrendrDraw, *pState, QUALITY=(*pState).render_quality
         end
+;
+;   Generate a png of the image. AL 2006
+;
+    'PNG' : begin
+        d_volrendrDraw, *pState, QUALITY=(*pState).render_quality
+        (*pState).rWindow->GetProperty, IMAGE_DATA=img
+        png_file=dialog_pickfile(/write, filter='*.png', title='File to save PNG to...')
+        WRITE_PNG, png_file, img
+        end
+
+
 ;
 ;   Set on or off the auto rendering property.
 ;
@@ -1087,6 +1099,8 @@ subBase = WIDGET_BASE(wBase, COLUMN=2)
     wLeftbase = WIDGET_BASE(subBase, /COLUMN)
         wRenderButton = WIDGET_BUTTON(wLeftBase, $
             VALUE="Render", UVALUE='RENDER', UNAME='d_volrendr:render')
+    	wPNGButton = WIDGET_BUTTON(wLeftBase, $
+            VALUE="Generate PNG", UVALUE='PNG', UNAME='d_volrendr:png')
 
         wNonExclusiveBase = WIDGET_BASE(wLeftBase, /NONEXCLUSIVE)
             wAutoRenderButton = WIDGET_BUTTON(wNonExclusiveBase, $
@@ -1260,6 +1274,7 @@ pState = PTR_NEW({      $
     wHotKeyReceptor: wHotKeyReceptor, $
     wLMBMode: wLMBMode, $
     wRenderButton: wRenderButton, $
+    wPNGButton: wPNGButton, $
     wAutoRenderButton: wAutoRenderButton, $
     wLightButton: wLightButton, $
     wWireBoxButton: wWireBoxButton, $
