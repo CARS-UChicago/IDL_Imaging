@@ -248,6 +248,7 @@ pro image_display::scale_image, image, min=min, max=max, zoom=zoom, $
     if (size[0] ne 2) then image = reform(image)
     self.image_data.x_size = n_elements(image(*,0))
     self.image_data.y_size = n_elements(image(0,*))
+    ptr_free, self.image_data.raw_data
     self.image_data.raw_data = ptr_new(image)
 
     if (n_elements(xdist) eq 0) then xdist = findgen(self.image_data.x_size)
@@ -259,6 +260,8 @@ pro image_display::scale_image, image, min=min, max=max, zoom=zoom, $
     if (n_elements(xdist) ne self.image_data.x_size) or $
        (n_elements(ydist) ne self.image_data.y_size) then $
         t = dialog_message('Size of xdist and ydist must match size of image')
+    ptr_free, self.image_data.x_dist
+    ptr_free, self.image_data.y_dist
     self.image_data.x_dist = ptr_new(xdist)
     self.image_data.y_dist = ptr_new(ydist)
 
@@ -306,6 +309,7 @@ pro image_display::scale_image, image, min=min, max=max, zoom=zoom, $
     if n_elements(interpolate) ne 0 then self.image_window.zoom_mode=1
     if n_elements(replicate) ne 0 then self.image_window.zoom_mode=0
 
+    ptr_free, self.image_data.display_buff
     self.image_data.display_buff = ptr_new(bytscl(*self.image_data.raw_data, $
                                        min=self.image_window.black_level, $
                                        max=self.image_window.white_level, $
@@ -414,11 +418,11 @@ pro image_display::event, event
         end
 
         self.widgets.MinMaxtable: begin
-            print, 'Type, X, Y ', event.type, event.X, event.Y
             widget_control, self.widgets.MinMaxtable, get_value=value
             if (event.Y eq 1) then begin
             self.image_window.black_level=value[0].display
             self.image_window.white_level=value[1].display
+            ptr_free, self.image_data.display_buff
             self.image_data.display_buff = $
                         ptr_new(bytscl(*self.image_data.raw_data, $
                                 min=self.image_window.black_level, $
