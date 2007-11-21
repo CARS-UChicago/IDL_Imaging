@@ -30,7 +30,7 @@ pro image_display, data, object, _EXTRA=extra
 ;
 ; PROCEDURE:
 ;       This procedure simply create a new object of class IMAGE_DISPLAY.
-;       See the documentation for IMAGE_DISPLAY for more information.
+;       See the documentation for the IMAGE_DISPLAY class library for more information.
 ;
 ; EXAMPLE:
 ;       IDL> a = DIST(512)
