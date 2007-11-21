@@ -1,2 +1,10 @@
-tar cvf /home/epics/public_html/pub/idl_imaging.tar make_movie.pro image_display.pro image_display__define.pro volume_render.pro
-
+tar cvhf /home/epics/public_html/pub/idl_imaging.tar \
+make_movie.pro \
+image_display.pro \
+image_display__define.pro \
+volume_render.pro \
+epics_image_display.pro \
+epics_image_display__define.pro \
+get_font_name.pro \
+make_epics_image_display_sav.pro \
+epics_image_display.sav  
