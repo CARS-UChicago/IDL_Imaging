@@ -4,7 +4,7 @@ pro image_display::write_output_file, format=format
     if (keyword_set(format) ne 0 ) then oform = format
     oform = strlowcase(oform)
 
-    if (!ORDER EQ 0) then begin
+    if (self.image_window.order EQ 0) then begin
         self->dc_to_ic, 0, 0, first_col, first_row, /clip
         self->dc_to_ic, self.image_window.x_size-1, self.image_window.y_size-1, $
                         last_col, last_row, /clip
@@ -12,7 +12,7 @@ pro image_display::write_output_file, format=format
       self->dc_to_ic, 0, self.image_window.y_size-1, first_col, first_row, /clip
       self->dc_to_ic, self.image_window.x_size-1, 0, last_col, last_row, /clip
     endelse
-    if (!ORDER EQ 0) then begin
+    if (self.image_window.order EQ 0) then begin
         self->ic_to_dc, first_col, first_row, x_offset, y_offset
         x_offset = (x_offset - self.image_window.x_zoom/2.) > 0
         y_offset = (y_offset - self.image_window.y_zoom/2.) > 0
@@ -67,11 +67,11 @@ pro image_display::write_output_file, format=format
                               title='Select Output Image File')
     if (outfile ne '') then begin
         case oform of
-            'jpg':  write_jpeg, outfile, ta, true=3, order=!order
-            'gif':  write_png,  outfile, buff, r, g, b, order=!order
-            'png':  write_png,  outfile, buff, r, g, b, order=!order
+            'jpg':  write_jpeg, outfile, ta, true=3, order=self.image_window.order
+            'gif':  write_png,  outfile, buff, r, g, b, order=self.image_window.order
+            'png':  write_png,  outfile, buff, r, g, b, order=self.image_window.order
             'bmp':  write_bmp,  outfile, ta
-            'tif':  write_tiff, outfile, buff, red=r, green=g, blue=b, orientation=!order
+            'tif':  write_tiff, outfile, buff, red=r, green=g, blue=b, orientation=self.image_window.order
             else:   outfile=''
         endcase
     endif
@@ -94,7 +94,7 @@ pro image_display::init_plot_windows, leave_mouse=leave_mouse
     self->dc_to_ic, 0, 0, x_min, y_min, /clip
     self->dc_to_ic, self.image_window.x_size-1, self.image_window.y_size-1, $
                 x_max, y_max, /clip
-    if (!order eq 1) then begin
+    if (self.image_window.order eq 1) then begin
         temp = y_max
         y_max = y_min
         y_min = temp
@@ -111,7 +111,7 @@ pro image_display::init_plot_windows, leave_mouse=leave_mouse
     xrange = [(x_axis(x_min) - 0.05*diff), (x_axis(x_max) + 0.05*diff)]
     diff = y_axis(y_max) - y_axis(y_min)
     yrange = [(y_axis(y_min) - 0.05*diff), (y_axis(y_max) + 0.05*diff)]
-    if (!order eq 1) then yrange=reverse(yrange)
+    if (self.image_window.order eq 1) then yrange=reverse(yrange)
     wset, self.row_plot_window.winid
     plot, x_axis(x_min:x_max), (*self.image_data.raw_data)(x_min:x_max, yc), $
             /nodata, $
@@ -198,7 +198,7 @@ pro image_display::display_image, noerase, leave_mouse=leave_mouse
 
     if n_elements(noerase) eq 0 then noerase=0
 
-    if (!ORDER EQ 0) then begin
+    if (self.image_window.order EQ 0) then begin
         self->dc_to_ic, 0, 0, first_col, first_row, /clip
         self->dc_to_ic, self.image_window.x_size-1, $
             self.image_window.y_size-1, $
@@ -209,7 +209,7 @@ pro image_display::display_image, noerase, leave_mouse=leave_mouse
         self->dc_to_ic, self.image_window.x_size-1, 0, $
             last_col, last_row, /clip
     endelse
-    if (!ORDER EQ 0) then begin
+    if (self.image_window.order EQ 0) then begin
         self->ic_to_dc, first_col, first_row, x_offset, y_offset
         x_offset = (x_offset - self.image_window.x_zoom/2.) > 0
         y_offset = (y_offset - self.image_window.y_zoom/2.) > 0
@@ -227,12 +227,12 @@ pro image_display::display_image, noerase, leave_mouse=leave_mouse
     if (self.image_window.x_zoom eq 1) and $
        (self.image_window.y_zoom eq 1) then begin
         tv, (*self.image_data.display_buff)(first_col:last_col, $
-                first_row:last_row), x_offset, y_offset
+                first_row:last_row), x_offset, y_offset, order=self.image_window.order
     endif else begin
         buff = rebin((*self.image_data.display_buff)(first_col:last_col, $
                         first_row:last_row), nc*self.image_window.x_zoom, $
                         nr*self.image_window.y_zoom, sample=sample)
-        tv, buff, x_offset, y_offset
+        tv, buff, x_offset, y_offset, order=self.image_window.order
     endelse
     self->init_plot_windows, leave_mouse=leave_mouse
 end
@@ -241,16 +241,92 @@ end
 pro image_display::scale_image, image, min=min, max=max, zoom=zoom, $
             center=center, noerase=noerase, interpolate=interpolate, $
             replicate=replicate, xdist=xdist, ydist=ydist, $
-            title=title, subtitle=subtitle, leave_mouse=leave_mouse
+            title=title, subtitle=subtitle, leave_mouse=leave_mouse, $
+            order=order, retain=retain
+;+
+; NAME:
+;       IMAGE_DISPLAY::SCALE_IMAGE
+;
+; PURPOSE:
+;       This routine displays a new image in an existing IMAGE_DISPLAY object.
+;
+; CATEGORY:
+;       Imaging
+;
+; CALLING SEQUENCE:
+;       image_data->SCALE_IMAGE, Data
+;
+; INPUTS:
+;       Data:   A 2-D array to be displayed
+;
+; KEYWORD PARAMETERS:
+;       XDIST:  An array containing the user units ("distance") of the
+;               X axis pixels.  Dimensions must be same as xsize of Data.
+;
+;       YDIST:  An array containing the user units ("distance") of the
+;               Y axis pixels.  Dimensions must be same as ysize of Data.
+;
+;       MIN:    The minimum display intensity.  Default=min(Data).
+;
+;       MAX:    The maximum display intensity.  Default=max(Data).
+;
+;       ZOOM:   A scaler or 2-element (X,Y) array of integer zoom factors.
+;               Default = 1 in each direction.  ZOOM=2 will zoom 2X in both
+;               directions, ZOOM=[1,2] will zoom 1X in X, 2X in Y.
+;
+;       CENTER: The location where the center of the image should be located
+;               in the display window.
+;               The default is the center of the display window.
+;               CENTER=[200,300] will center the image at X=200, Y=300
+;
+;       NOERASE: Set this flag to not erase the window before displaying the
+;               image.  Allows multiple images to share a window.
+;
+;       INTERPOLATE:  Zoom the image by interpolation rather than replication.
+;
+;       REPLICATE: Zoom the image by replication rather than interpolation.
+;
+;       TITLE:  The title to give the display window.
+;
+;       SUBTITLE:  The subtitle to give the display window.
+;
+;       ORDER:  The order in which to display the image.
+;               0=bottom to top
+;               1=top to bottom
+;               Default = Existing order
+;
+;       LEAVE_MOUSE:  Set this keyword to not move the mouse to the center of the
+;               new image display.
+;
+;       RETAIN: Set this keyword to not reset the zoom and intensity scaling when
+;               when the new data are displayed.  This requires that the dimensions
+;               of the image be the same as the image currently displayed.
+;
+; MODIFICATION HISTORY:
+;       Written by:     Mark Rivers (3-DEC-1998)
+;       20-Nov-2007  MLR  Added ORDER and RETAIN keywords.
+;
+; EXAMPLE:
+;       IDL> a = DIST(512)
+;       IDL> obj = OBJ_NEW('IMAGE_DISPLAY', a)
+;       IDL> obj->SCALE_IMAGE, a+100, /RETAIN
+;
+;-
 
 
     size = size(image)
+    if (n_elements(order) ne 0) then self.image_window.order = order
+
     if (size[0] ne 2) then image = reform(image)
     self.image_data.x_size = n_elements(image(*,0))
     self.image_data.y_size = n_elements(image(0,*))
     ptr_free, self.image_data.raw_data
     self.image_data.raw_data = ptr_new(image)
 
+    if (keyword_set(retain)) then begin
+        xdist = *self.image_data.x_dist
+        ydist = *self.image_data.y_dist
+    endif
     if (n_elements(xdist) eq 0) then xdist = findgen(self.image_data.x_size)
     if (n_elements(ydist) eq 0) then ydist = findgen(self.image_data.y_size)
     if (n_elements(title) ne 0) then begin
@@ -267,8 +343,10 @@ pro image_display::scale_image, image, min=min, max=max, zoom=zoom, $
 
     case n_elements(center) of
         0: begin
-            self.image_window.x_cent_i = self.image_data.x_size/2
-            self.image_window.y_cent_i = self.image_data.y_size/2
+            if (not keyword_set(retain)) then begin
+                self.image_window.x_cent_i = self.image_data.x_size/2
+                self.image_window.y_cent_i = self.image_data.y_size/2
+            endif
         end
         1: begin
             self.image_window.x_cent_i = center
@@ -282,10 +360,15 @@ pro image_display::scale_image, image, min=min, max=max, zoom=zoom, $
 
     case n_elements(zoom) of
         0: begin
-            x_zoom = self.image_window.x_size / self.image_data.x_size
-            y_zoom = self.image_window.y_size / self.image_data.y_size
-            if (x_zoom gt y_zoom) then x_zoom = y_zoom
-            if (y_zoom gt x_zoom) then y_zoom = x_zoom
+            if (keyword_set(retain)) then begin
+                x_zoom = self.image_window.x_zoom
+                y_zoom = self.image_window.y_zoom
+            endif else begin
+                x_zoom = self.image_window.x_size / self.image_data.x_size
+                y_zoom = self.image_window.y_size / self.image_data.y_size
+                if (x_zoom gt y_zoom) then x_zoom = y_zoom
+                if (y_zoom gt x_zoom) then y_zoom = x_zoom
+            endelse
         end
         1: begin
             x_zoom = zoom
@@ -299,11 +382,21 @@ pro image_display::scale_image, image, min=min, max=max, zoom=zoom, $
     self.image_window.x_zoom = x_zoom > 1
     self.image_window.y_zoom = y_zoom > 1
 
-    if n_elements(min) eq 0 then self.image_window.black_level = min(image) $
-        else self.image_window.black_level = min
+    if (n_elements(min) ne 0) then begin
+        self.image_window.black_level = min
+    endif else begin
+        if (not keyword_set(retain)) then begin
+            self.image_window.black_level = min(image)
+        endif
+    endelse
 
-    if n_elements(max) eq 0 then self.image_window.white_level = max(image) $
-        else self.image_window.white_level = max
+    if (n_elements(max) ne 0) then begin
+        self.image_window.white_level = max
+    endif else begin
+        if (not keyword_set(retain)) then begin
+            self.image_window.white_level = max(image)
+        endif
+    endelse
 
     if n_elements(noerase) eq 0 then noerase = 0
     if n_elements(interpolate) ne 0 then self.image_window.zoom_mode=1
@@ -315,16 +408,19 @@ pro image_display::scale_image, image, min=min, max=max, zoom=zoom, $
                                        max=self.image_window.white_level, $
                                        top=!D.TABLE_SIZE-1))
 
+    self.MinMaxtable[0].actual=min(image)
+    self.MinMaxtable[1].actual=max(image)
     self.MinMaxtable[0].display=self.image_window.black_level
     self.MinMaxtable[1].display=self.image_window.white_level
     widget_control, self.widgets.MinMaxtable, set_value=self.MinMaxtable
+    widget_control, self.widgets.order, set_droplist_select=self.image_window.order
     self->display_image, leave_mouse=leave_mouse
 end
 
 
 pro image_display::dc_to_ic, xd, yd, xi, yi, clip=clip
 
-    if (!ORDER EQ 1) then y_dir = -1 else y_dir = 1
+    if (self.image_window.order EQ 1) then y_dir = -1 else y_dir = 1
     x_dir = 1
     xi = (xd - self.image_window.x_size/2) / $
                 (x_dir * self.image_window.x_zoom) + $
@@ -342,7 +438,7 @@ end
 
 pro image_display::ic_to_dc, xi, yi, xd, yd, clip=clip
 
-    if (!ORDER EQ 1) then y_dir = -1 else y_dir = 1
+    if (self.image_window.order EQ 1) then y_dir = -1 else y_dir = 1
     x_dir = 1
     xd = self.image_window.x_size/2 + $
             x_dir*(xi - self.image_window.x_cent_i) * self.image_window.x_zoom
@@ -420,10 +516,10 @@ pro image_display::event, event
         self.widgets.MinMaxtable: begin
             widget_control, self.widgets.MinMaxtable, get_value=value
             if (event.Y eq 1) then begin
-            self.image_window.black_level=value[0].display
-            self.image_window.white_level=value[1].display
-            ptr_free, self.image_data.display_buff
-            self.image_data.display_buff = $
+                self.image_window.black_level=value[0].display
+                self.image_window.white_level=value[1].display
+                ptr_free, self.image_data.display_buff
+                self.image_data.display_buff = $
                         ptr_new(bytscl(*self.image_data.raw_data, $
                                 min=self.image_window.black_level, $
                                 max=self.image_window.white_level, $
@@ -432,9 +528,31 @@ pro image_display::event, event
             self->display_image
         end
 
+        self.widgets.order: begin
+            self.image_window.order = widget_info(event.id, $
+                                                      /droplist_select)
+        print, 'order=', self.image_window.order
+            self->display_image
+        end
+
         self.widgets.zoom_mode: begin
             self.image_window.zoom_mode = widget_info(event.id, $
                                                       /droplist_select)
+            self->display_image
+        end
+
+        self.widgets.autoscale: begin
+            self.image_window.black_level=min(*self.image_data.raw_data)
+            self.image_window.white_level=max(*self.image_data.raw_data)
+            self.MinMaxtable[0].display=self.image_window.black_level
+            self.MinMaxtable[1].display=self.image_window.white_level
+            widget_control, self.widgets.MinMaxtable, set_value=self.MinMaxtable
+            ptr_free, self.image_data.display_buff
+            self.image_data.display_buff = $
+                        ptr_new(bytscl(*self.image_data.raw_data, $
+                                min=self.image_window.black_level, $
+                                max=self.image_window.white_level, $
+                                top=!D.TABLE_SIZE-1))
             self->display_image
         end
 
@@ -462,7 +580,7 @@ end
 
 function image_display::init, data, xsize=xsize, ysize=ysize, $
                                     xdist=xdist, ydist=ydist, min=min, max=max, $
-                                    title=title, subtitle=subtitle
+                                    title=title, subtitle=subtitle, order=order
 ;+
 ; NAME:
 ;       IMAGE_DISPLAY::INIT
@@ -485,7 +603,30 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
 ;       Data:   A 2-D array to be displayed
 ;
 ; KEYWORD PARAMETERS:
+;       XSIZE:  The number of pixels horizontally in the image window.
+;               Default is the greater of 400 pixels or the xsize of Data.
 ;
+;       YSIZE:  The number of pixels vertically in the image window.
+;               Default is the greater of 400 pixels or the ysize of Data.
+;
+;       XDIST:  An array containing the user units ("distance") of the
+;               X axis pixels.  Dimensions must be same as xsize of Data.
+;
+;       YDIST:  An array containing the user units ("distance") of the
+;               Y axis pixels.  Dimensions must be same as ysize of Data.
+;
+;       MIN:    The minimum display intensity.  Default=min(Data).
+;
+;       MAX:    The maximum display intensity.  Default=max(Data).
+;
+;       TITLE:  The title to give the display window.
+;
+;       SUBTITLE:  The subtitle to give the display window.
+;
+;       ORDER:  The order in which to display the image.
+;               0=bottom to top
+;               1=top to bottom
+;               Default = !ORDER system variable when this function is called.
 ;
 ; OUTPUTS:
 ;       This function returns 1 to indicate that the object was successfully
@@ -511,15 +652,20 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
 ;                        is not needed.
 ;       27-APR-2002 MLR  Added order keywords to write_jpeg and write_png so images
 ;                        are correct side up.
-;                        Fixed bug in plotting vertical column profile if !order=1, thanks
+;                        Fixed bug in plotting vertical column profile if self.image_window.order=1, thanks
 ;                        to Peter Vontobel of Swiss Light Source.
 ;
 ;       4-JUN-2002  MLR  Added "title" keyword to image_display::display_image
 ;                        and "leave_mouse" keyword to other routines.  These
 ;                        changes allow tomo_display:: to scroll though 2-D
-;                        slices in a 3-D volume quickly and easily. 
+;                        slices in a 3-D volume quickly and easily.
 ;
-;       27-APR-2006  MLR Added "tiff" output option 
+;       27-APR-2006  MLR Added "tiff" output option
+;
+;       21-NOV-2007  MLR Added order keyword and order widget, no longer use !order except at startup
+;                        Added RETAIN keyword to SCALE_IMAGE, to preserve zoom, center and intensity
+;                        scaling.
+;                        Added autoscale widget for automatically scaling display range.
 ;-
 
     size = size(data)
@@ -530,6 +676,8 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
     if (n_elements(ysize) eq 0) then ysize=size[2] > 400
     self.image_window.x_size = xsize
     self.image_window.y_size = ysize
+    if (n_elements(order) eq 0) then order=!order
+    self.image_window.order = order
 
     self.row_plot_window.y_size=200
     self.col_plot_window.x_size=200
@@ -568,27 +716,35 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
                                     /column_major, $
                                     column_label=['Min', 'Max'], $
                                     row_label=['Actual', 'Display'], /edit)
+    col = widget_base(row, column=1, /align_center)
+    self.widgets.autoscale = widget_button(col, value='Autoscale')
     row = widget_base(self.widgets.base, row=1)
     base = widget_base(row, xsize=self.col_plot_window.x_size, $
                         ysize=self.row_plot_window.y_size, column=1)
     col = widget_base(base, column=1, /align_center)
-    col1 = widget_base(col, column=1, /frame, /align_center)
+    row1 = widget_base(col, row=1, /frame, /align_center)
+    col1 = widget_base(row1, column=1, /align_center)
+    t = widget_label(col1, value='Display order')
+    self.widgets.order = widget_droplist(col1, $
+                                value=['Bottom to top', 'Top to bottom'])
+    col1 = widget_base(row1, col=1, /align_center)
     t = widget_label(col1, value='Zoom Mode')
     self.widgets.zoom_mode = widget_droplist(col1, $
                                 value=['Replicate', 'Interpolate'])
-    self.widgets.new_color_table = widget_button(col, value='New color table')
-    self.widgets.apply_color_table = widget_button(col, $
+    row1 = widget_base(col, row=1, /frame, /align_center)
+    self.widgets.new_color_table = widget_button(row1, value='New color table')
+    self.widgets.apply_color_table = widget_button(row1, $
                                 value='Apply color table')
     self.image_data.oformats = ['JPEG', 'BMP', 'PNG', 'TIF']
     self.image_data.out_form = 0
 
-    ocol = widget_base(base, column=1, /align_center,/frame)
-    col1 = widget_base(ocol, /row)
-    t  = widget_label(col1, value='Output Format')
-    self.widgets.out_form = widget_droplist(col1, value=self.image_data.oformats)
+    col1 = widget_base(base, column=1, /align_center,/frame)
+    row1 = widget_base(col1, row=1)
+    t  = widget_label(row1, value='Output Format')
+    self.widgets.out_form = widget_droplist(row1, value=self.image_data.oformats)
 
     widget_control, self.widgets.out_form,  set_droplist_select=self.image_data.out_form
-    self.widgets.out_file = widget_button(ocol, value='Write Image File')
+    self.widgets.out_file = widget_button(col1, value='Write Image File')
     self.widgets.row_plot = widget_draw(row, xsize=xsize, $
                                          ysize=self.row_plot_window.y_size)
     row = widget_base(self.widgets.base, row=1)
@@ -605,10 +761,6 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
     self.col_plot_window.winid = window
     widget_control, self.widgets.image, get_value=window
     self.image_window.winid = window
-
-    self.MinMaxtable[0].actual=min(data)
-    self.MinMaxtable[1].actual=max(data)
-    widget_control, self.widgets.MinMaxtable, set_value=self.MinMaxtable
 
     self->scale_image, data, xdist=xdist, ydist=ydist, min=min, max=max
     widget_control, self.widgets.base, set_uvalue=self
@@ -633,6 +785,8 @@ pro image_display__define, data, xsize=xsize, ysize=ysize
         col_plot: 0L, $
         XYtable: 0L, $
         MinMaxtable: 0L, $
+        order:     0L, $
+        autoscale: 0L, $
         zoom_mode: 0L, $
         new_color_table: 0L, $
         apply_color_table: 0L, $
@@ -657,6 +811,7 @@ pro image_display__define, data, xsize=xsize, ysize=ysize
         x_zoom: 0L, $
         y_zoom: 0L, $
         zoom_mode: 0L, $
+        order:    0L, $
         x_cent_i: 0L, $
         y_cent_i: 0L, $
         x_min: 0L, $
