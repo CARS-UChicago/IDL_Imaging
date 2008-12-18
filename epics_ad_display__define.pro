@@ -1,19 +1,13 @@
 pro epics_ad_display::connect_detector
-    self.counter_pv = self.base_pv + 'ArrayCounter_RBV'
-    status = caSetMonitor(self.counter_pv)
-    self.nx_pv      = self.base_pv + 'ArraySize0_RBV'
-    self.ny_pv      = self.base_pv + 'ArraySize1_RBV'
-    self.image_pv   = self.base_pv + 'ArrayData'
-    status = caSetMonitor(self.counter_pv)
-    status = caSetMonitor(self.nx_pv)
-    status = caSetMonitor(self.ny_pv)
-    status = caGet(self.image_pv, v)
-    if (status ne 0) then begin
-        self.connected = 0;
-        widget_control, self.widgets.message, set_value='Unable to connect to detector: ' + self.base_pv
-    endif else begin
+    if (obj_valid(self.detector)) then obj_destroy, self.detector
+    self.detector = obj_new('epics_nd_std_arrays', self.base_pv)
+    if (obj_valid(self.detector)) then begin
         self.connected = 1
-        widget_control, self.widgets.message, set_value='Connected to detector: ' + self.base_pv
+        widget_control, self.widgets.message, set_value=systime(0) + ': Connected to detector: ' + self.base_pv
+        widget_control, self.widgets.timer, timer=self.display_interval
+    endif else begin
+        self.connected = 0;
+        widget_control, self.widgets.message, set_value=systime(0) + ': Unable to connect to detector: ' + self.base_pv
     endelse
 end
 
@@ -29,15 +23,6 @@ pro epics_ad_display::event, event
         widget_control, event.top, /destroy
         obj_destroy, self
         return
-    endif
-
-    catch, err
-    if (err ne 0) then begin
-       t = dialog_message(!error_state.msg, /error)
-        widget_control, self.widgets.message, set_value=!error_state.msg
-        ; Re-enable timer in case error was in timer widget case statement
-        widget_control, self.widgets.timer, timer=self.timer_interval
-        goto, end_event
     endif
 
     case event.id of
@@ -80,54 +65,53 @@ pro epics_ad_display::event, event
             self.display_max = event.value
         end
 
-        self.widgets.base_pv: begin
-            widget_control, self.widgets.base_pv, get_value=t
-            if (strlen(t) gt 0) then begin
-                self.base_pv = t
-                self->connect_detector
-            endif
-        end
-
         self.widgets.timer: begin
+            catch, err
+            if (err ne 0) then begin
+                ; We got an error.  This is almost certainly because the detector
+                ; is not available.
+                print, !error_state.msg
+                ; Re-enable timer with connect interval so it tries to reconnect, but not too
+                ; frequently
+                widget_control, self.widgets.timer, timer=self.connect_interval
+                return
+            endif
             ; Timer event to check for new data and display it.
-            ; Reset the timer
-            widget_control, self.widgets.timer, timer=self.timer_interval
             ; If we are not connected try to connect
             if (not self.connected) then self->connect_detector
             ; If that did not work, try again next time
-            if (not self.connected) then break
+            if (not self.connected) then begin
+                widget_control, self.widgets.timer, timer=self.connect_interval
+                return
+            endif
+            ; If we get to here then we are connected
+            ; Reset the timer for the display interval
+            widget_control, self.widgets.timer, timer=self.display_interval
             if (not self.display_enable) then break
-            ; There is a bug in ezca, it takes a very long time for monitors on large arrays to be detected
-            ; So instead we don't set a monitor on the data array, we set a monitor on the counter PV and
-            ; do a caGet on the image data.
-            ; We loop here so that we can display a number of frames in rapid succession without waiting
             ; for the widget timer event between frame
             for i=0, self.frames_per_loop do begin
-                new_data = caCheckMonitor(self.counter_pv)
+                new_data = self.detector->newArray()
                 if (new_data eq 0) then break
                 ; There is new data, display it
-                ; Read the counter to clear the monitor
-                status = caget(self.counter_pv)
-                if (status ne 0) then goto, not_connected
-                ; Read the new image sizes
+                data = self.detector->getArray()
+                ; Get the new image sizes
                 size_changed = 0
-                status = caget(self.nx_pv, nx)
-                if (status ne 0) then goto, not_connected
+                dims = size(data, /dimensions)
+                nx = dims[0]
+                ny = dims[1]
                 if (nx ne self.nx) then begin
                     self.nx = nx
                     size_changed = 1
                     widget_control, self.widgets.nx, set_value=nx
                 endif
-                status = caget(self.ny_pv, ny)
-                if (status ne 0) then goto, not_connected
                 if (ny ne self.ny) then begin
                     self.ny = ny
                     size_changed = 1
                     widget_control, self.widgets.ny, set_value=ny
                 endif
-                if (self.nx eq 0) or (self.ny eq 0) then goto, end_event
+                if (self.nx eq 0) or (self.ny eq 0) then return
                 retain = size_changed eq 0
-                self->display_image, retain=retain
+                self->display_image, data, retain=retain
                 self.image_counter = self.image_counter + 1
             endfor
             time = systime(1)
@@ -141,33 +125,17 @@ pro epics_ad_display::event, event
                 self.last_update = time
                 self.image_counter = 0
             endif
-            widget_control, self.widgets.timer, timer=self.timer_interval
+            ; Need to set the timer again because the time might have elapsed in display?
+            widget_control, self.widgets.timer, timer=self.display_interval
 
         end
 
         else:  t = dialog_message('Unknown event')
     endcase
     return
-
-    not_connected:
-        widget_control, self.widgets.message, set_value='Disconnected from image PV: ' + self.image_pv
-        self.connected = 0
-        return
-
-    end_event:
 end
 
-pro epics_ad_display::display_image, retain=retain
-    t = caget(self.image_pv, data, max=self.nx*self.ny)
-    if (t ne 0) then begin
-        print, 'Error reading image'
-        return
-    endif
-    if (n_elements(data) ne self.nx*self.ny) then begin
-        print, 'Image is wrong size'
-        return
-    endif
-    data = reform(data, self.nx, self.ny, /overwrite)
+pro epics_ad_display::display_image, data, retain=retain
     ; If we are using iTools or tv then make data byte type
     if (self.display_mode ne 1) then begin
         if (self.autoscale) then begin
@@ -193,7 +161,7 @@ pro epics_ad_display::display_image, retain=retain
     0: begin
            catch, err
            if ((err ne 0) or (retain eq 0)) then begin
-               if (err ne 0) then stop
+               if (err ne 0) then print, !error_state.msg
                device, window_state=state
                if (state[self.tv_window] ne 0) then begin
                    device, get_window_position=position
@@ -207,6 +175,7 @@ pro epics_ad_display::display_image, retain=retain
            endif
            wset, self.tv_window
            tv, data
+           catch, /cancel
        end
     1: begin
            if ((not obj_valid(self.image_display)) or (retain eq 0)) then begin
@@ -297,7 +266,8 @@ function epics_ad_display::init, base_pv
     self.connected = 0
     self.display_min = 0
     self.display_max = 255
-    self.timer_interval = 0.01
+    self.display_interval = 0.01
+    self.connect_interval = 2.0
     self.display_enable = 1
     self.flip_y = 0
     self.display_mode = 0
@@ -354,14 +324,14 @@ function epics_ad_display::init, base_pv
     self.widgets.frame_rate = cw_field(row, /column, title='Frames/sec', xsize=8, /noedit)
 
     row = widget_base(self.widgets.base, /row)
-    self.widgets.message = cw_field(row, /row, title='Message', xsize=50)
+    self.widgets.message = cw_field(row, /row, title='Message', xsize=100)
 
     widget_control, self.widgets.base, set_uvalue=self
     widget_control, self.widgets.base, /realize
 
     ; Timer widgets
     self.widgets.timer = self.widgets.base
-    widget_control, self.widgets.timer, timer=self.timer_interval
+    widget_control, self.widgets.timer, timer=self.display_interval
 
     self.tv_window = 10
 
@@ -405,12 +375,9 @@ pro epics_ad_display__define
         fonts:          fonts, $
         image_display:  obj_new(), $
         iimage_obj:     obj_new(), $
-        tv_window:      0L, $
+        detector:       obj_new(), $
         base_pv:        "", $
-        image_pv:       "", $
-        nx_pv:          "", $
-        ny_pv:          "", $
-        counter_pv:     "", $
+        tv_window:      0L, $
         connected:      0L, $
         nx:             0L, $
         ny:             0L, $
@@ -423,6 +390,7 @@ pro epics_ad_display__define
         image_counter:  0L, $
         last_update:    0.0D, $
         frames_per_loop: 0L, $
-        timer_interval: 0.0 $
+        display_interval: 0.0, $
+        connect_interval: 0.0 $
     }
 end
