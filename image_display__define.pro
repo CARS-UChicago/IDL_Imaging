@@ -26,7 +26,6 @@ pro image_display::write_output_file, format=format
     nr = last_row - first_row + 1
     if self.image_window.zoom_mode eq 0 then sample=1 else sample=0
     wset, self.image_window.winid
-    ; if noerase eq 0 then erase
 
     buff = rebin((*self.image_data.display_buff)(first_col:last_col, first_row:last_row), $
                   nc*self.image_window.x_zoom, nr*self.image_window.y_zoom, sample=sample)
@@ -86,10 +85,14 @@ end
 ;------------------
 pro image_display::init_plot_windows, leave_mouse=leave_mouse
 
-    x_mouse=self.image_window.x_size/2
-    y_mouse=self.image_window.y_size/2
+    if (keyword_set(leave_mouse)) then begin
+        cursor, x_mouse, y_mouse, /nowait, /device
+    endif else begin
+        x_mouse=self.image_window.x_size/2
+        y_mouse=self.image_window.y_size/2
+        tvcrs, x_mouse, y_mouse
+    endelse
     wset, self.image_window.winid
-    if (not keyword_set(leave_mouse)) then tvcrs, x_mouse, y_mouse
     self->dc_to_ic, x_mouse, y_mouse, xc, yc, /clip
     self->dc_to_ic, 0, 0, x_min, y_min, /clip
     self->dc_to_ic, self.image_window.x_size-1, self.image_window.y_size-1, $
@@ -194,7 +197,7 @@ pro image_display::plot_profiles, x_mouse, y_mouse
 end
 
 
-pro image_display::display_image, noerase, leave_mouse=leave_mouse
+pro image_display::display_image, noerase=noerase, leave_mouse=leave_mouse
 
     if n_elements(noerase) eq 0 then noerase=0
 
@@ -238,6 +241,26 @@ pro image_display::display_image, noerase, leave_mouse=leave_mouse
 end
 
 
+pro image_display::set_image_data, image
+    isize = size(image)
+    if (isize[0] ne 2) then image = reform(image)
+    self.image_data.x_size = n_elements(image(*,0))
+    self.image_data.y_size = n_elements(image(0,*))
+    ptr_free, self.image_data.raw_data
+    self.image_data.raw_data = ptr_new(image)
+
+    xdist = findgen(self.image_data.x_size)
+    ydist = findgen(self.image_data.y_size)
+
+    ptr_free, self.image_data.x_dist
+    ptr_free, self.image_data.y_dist
+    self.image_data.x_dist = ptr_new(xdist)
+    self.image_data.y_dist = ptr_new(ydist)
+
+
+return 
+end
+
 pro image_display::scale_image, image, min=min, max=max, zoom=zoom, $
             center=center, noerase=noerase, interpolate=interpolate, $
             replicate=replicate, xdist=xdist, ydist=ydist, $
@@ -315,7 +338,12 @@ pro image_display::scale_image, image, min=min, max=max, zoom=zoom, $
 
 
     size = size(image)
-    if (n_elements(order) ne 0) then self.image_window.order = order
+    if (n_elements(order) ne 0) then begin
+        if (order ne self.image_window.order) then begin
+            self.image_window.order = order
+            widget_control, self.widgets.order, set_droplist_select=self.image_window.order
+        endif
+    endif
 
     if (size[0] ne 2) then image = reform(image)
     self.image_data.x_size = n_elements(image(*,0))
@@ -413,8 +441,7 @@ pro image_display::scale_image, image, min=min, max=max, zoom=zoom, $
     self.MinMaxtable[0].display=self.image_window.black_level
     self.MinMaxtable[1].display=self.image_window.white_level
     widget_control, self.widgets.MinMaxtable, set_value=self.MinMaxtable
-    widget_control, self.widgets.order, set_droplist_select=self.image_window.order
-    self->display_image, leave_mouse=leave_mouse
+    self->display_image, noerase=noerase, leave_mouse=leave_mouse
 end
 
 
@@ -531,7 +558,6 @@ pro image_display::event, event
         self.widgets.order: begin
             self.image_window.order = widget_info(event.id, $
                                                       /droplist_select)
-        print, 'order=', self.image_window.order
             self->display_image
         end
 
