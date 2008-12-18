@@ -78,7 +78,7 @@ end
 
 pro epics_image_display::display_image, retain=retain
     widget_control, self.widgets.message, set_value='Got new image at ' + systime(0)
-    t = caget(self.image_pv, data)
+    t = caget(self.image_pv, data, max=self.nx*self.ny)
     if (t ne 0) then begin
         print, 'Error reading image'
         return
@@ -88,7 +88,7 @@ pro epics_image_display::display_image, retain=retain
         return
     endif
     data = reform(data, self.nx, self.ny, /overwrite)
-    ;iimage, data, overplot=self.iimage_id\
+    ;iimage, data, overplot=self.iimage_id
     self.image_display->scale_image, data, /leave_mouse, retain=retain
 end
 
@@ -210,7 +210,7 @@ function epics_image_display::init, image_pv, nx=nx, ny=ny, delay=delay
 
     ; Timer widgets
     self.widgets.timer = self.widgets.base
-    self.timer_interval = 0.1
+    self.timer_interval = 0.01
     widget_control, self.widgets.timer, timer=self.timer_interval
 
     xmanager, 'epics_image_display', self.widgets.base, /no_block
