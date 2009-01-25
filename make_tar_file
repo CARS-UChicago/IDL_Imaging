@@ -3,8 +3,8 @@ make_movie.pro \
 image_display.pro \
 image_display__define.pro \
 volume_render.pro \
-epics_image_display.pro \
-epics_image_display__define.pro \
 get_font_name.pro \
-make_epics_image_display_sav.pro \
-epics_image_display.sav  
+epics_ad_display.pro \
+epics_ad_display__define.pro \
+make_epics_ad_display_sav.pro \
+epics_ad_display.sav  
