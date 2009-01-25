@@ -96,10 +96,40 @@ pro epics_ad_display::event, event
                 data = self.detector->getArray()
                 ; Get the new image sizes
                 size_changed = 0
+                colorMode = self.detector->getProperty('ColorMode_RBV')
                 dims = size(data, /dimensions)
-                nx = dims[0]
-                ny = dims[1]
-                if (nx ne self.nx) then begin
+                ; If any of the dimensions is 1 then reform the array
+                t = where(dims eq 1, count)
+                if (count ne 0) then data = reform(data)
+                dims = size(data, /dimensions)
+                case colorMode of
+                    'Mono': begin
+                        nx = dims[0]
+                        ny = dims[1]
+                        true = 0
+                    end
+                    'Bayer': begin
+                        nx = dims[0]
+                        ny = dims[1]
+                        true = 0
+                    end
+                    'RGB1': begin
+                        nx = dims[1]
+                        ny = dims[2]
+                        true = 1
+                    end
+                    'RGB2': begin
+                        nx = dims[0]
+                        ny = dims[2]
+                        true = 2
+                    end
+                    'RGB3': begin
+                        nx = dims[0]
+                        ny = dims[1]
+                        true = 3
+                    end
+                endcase
+                 if (nx ne self.nx) then begin
                     self.nx = nx
                     size_changed = 1
                     widget_control, self.widgets.nx, set_value=nx
@@ -111,7 +141,7 @@ pro epics_ad_display::event, event
                 endif
                 if (self.nx eq 0) or (self.ny eq 0) then return
                 retain = size_changed eq 0
-                self->display_image, data, retain=retain
+                self->display_image, data, true=true, retain=retain
                 self.image_counter = self.image_counter + 1
             endfor
             time = systime(1)
@@ -135,7 +165,7 @@ pro epics_ad_display::event, event
     return
 end
 
-pro epics_ad_display::display_image, data, retain=retain
+pro epics_ad_display::display_image, data, true=true, retain=retain
     ; If we are using iTools or tv then make data byte type
     if (self.display_mode ne 1) then begin
         if (self.autoscale) then begin
@@ -154,8 +184,13 @@ pro epics_ad_display::display_image, data, retain=retain
             data = bytscl(data, min=black, max=white)
         endif
     endif
-    ; Flip the data vertically if desired
-    if (self.flip_y) then data = rotate(data, 7)
+    ; Flip the data vertically if desired.  Use rotate for mono data (it's faster) and
+    ; order for color because rotate does not work
+    order = 0
+    if (self.flip_y) then begin
+        ndims = size(data, /n_dimensions)
+        if (ndims eq 2) then data = rotate(data, 7) else order=1
+    endif
 
     case self.display_mode of
     0: begin
@@ -174,7 +209,7 @@ pro epics_ad_display::display_image, data, retain=retain
                wshow, self.tv_window
            endif
            wset, self.tv_window
-           tv, data
+           tv, data, true=true, order=order
            catch, /cancel
        end
     1: begin
