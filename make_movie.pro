@@ -395,6 +395,8 @@ for frame=start, stop, step do begin
     endif
     str = 'Frame = ' + strtrim(frame,2) + '/' + strtrim(stop,2)
     if (mp4_mode) then begin
+      ; Need to flip the image vertically for some reason
+      temp = reverse(temp, 3)
       print, str
       write_video, mp4_file, temp, handle=handle, video_fps=fps, bit_rate=bps
     endif else if (mpeg_mode) then begin
