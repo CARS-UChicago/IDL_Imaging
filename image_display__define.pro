@@ -489,8 +489,19 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
   self.volume_data.z_dist = ptr_new(zdist)
 
   max_size = max(dims)
-  if (n_elements(xsize) eq 0) then xsize = max_size > 400 < 1024
-  if (n_elements(ysize) eq 0) then ysize = max_size > 400 < 1024
+  device, get_screen_size=scr_size
+  scr_size = scr_size - 450
+  r = float(dims)/scr_size
+  if (r[1] gt r[0]) then begin
+    ys = scr_size[1]
+    xs = float(scr_size[1]) * dims[0] / dims[1]
+  endif else begin
+    xs = scr_size[0]
+    ys = float(scr_size[0]) * dims[1] / dims[0]
+  endelse
+  d = dims * min(r)
+  if (n_elements(xsize) eq 0) then xsize = max_size > 400 < xs
+  if (n_elements(ysize) eq 0) then ysize = max_size > 400 < ys
   self.image_window.x_size = xsize
   self.image_window.y_size = ysize
   if (n_elements(order) eq 0) then order=!order
