@@ -123,12 +123,28 @@ pro image_display::update_image
 end
 
 
-pro image_display::set_image_data, data, title=title
+pro image_display::set_image_data, data, title=title, min=min, max=max
 
   if (n_elements(title) eq 0) then title = 'IDL Image Display'
   self.image_data.title = title
   widget_control, self.widgets.base, tlb_set_title=title
 
+  ndims = size(data, /n_dimensions)
+  if (ndims ne 2) then data = reform(data)
+  min_data = min(data, max=max_data)
+  widget_control, self.widgets.min_actual, set_value = string(min_data)
+  widget_control, self.widgets.max_actual, set_value = string(max_data)
+
+  if (n_elements(min) ne 0) then  begin
+    self.image_window.black_level = min
+    widget_control, self.widgets.min_set, set_value = string(min)
+  endif
+
+  if (n_elements(max) ne 0) then begin
+    self.image_window.white_level = max
+    widget_control, self.widgets.max_set, set_value = string(max)
+  endif
+ 
   ptr_free, self.image_data.raw_data
   self.image_data.raw_data = ptr_new(data)
   self.image_window.image_obj->setdata, data, order=self.image_window.order
@@ -236,17 +252,6 @@ pro image_display::new_image, data, $
   self.image_data.x_dist = ptr_new(xdist)
   self.image_data.y_dist = ptr_new(ydist)
 
-  min_data = min(data, max=max_data)
-  if (n_elements(min) eq 0) then min = min_data
-  self.image_window.black_level = min
-  widget_control, self.widgets.min_set, set_value = string(min)
-  widget_control, self.widgets.min_actual, set_value = string(min_data)
-
-  if (n_elements(max) eq 0) then max = max_data
-  self.image_window.white_level = max
-  widget_control, self.widgets.max_set, set_value = string(max)
-  widget_control, self.widgets.max_actual, set_value = string(max_data)
-
   if (obj_valid(self.image_window.image_obj)) then (self.image_window.image_obj).erase
   (self.image_window.window_obj).select
   self.image_window.image_obj = image(data, /current, order=self.image_window.order, margin=0)
@@ -274,7 +279,11 @@ pro image_display::new_image, data, $
   axes[0].text_orientation = 90
   axes[1].textpos = 1
 
-  self->set_image_data, data, title=title
+  min_data = min(data, max=max_data)
+  if (n_elements(min) eq 0) then min = min_data
+  if (n_elements(max) eq 0) then max = max_data
+
+  self->set_image_data, data, title=title, min=min, max=max
 end
 
 
