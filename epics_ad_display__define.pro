@@ -237,8 +237,9 @@ pro epics_ad_display::display_image, dataIn, true=true, retain=retain
            if ((not obj_valid(self.image_display)) or (retain eq 0)) then begin
                self.image_display = obj_new('image_display', data, order=1)
            endif else begin
-               self.image_display->scale_image, data, /leave_mouse, /noerase, retain=retain, $
-                                                min=black, max=white
+               ;self.image_display->scale_image, data, /leave_mouse, /noerase, retain=retain, $
+               ;                                 min=black, max=white
+               self.image_display->set_image_data, data
            endelse
        end
     2: begin
