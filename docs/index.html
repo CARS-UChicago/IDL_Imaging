@@ -1,10 +1,31 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
-<html>
-<head>
-<title>Documentation for GSECARS IDL imaging routines</title>
-</head>
-<h1>Documentation for GSECARS IDL imaging routines</h1>
-<body>
-<a href="imaging_routines.html">IDL generated help files</a>
-</body>
-</html>
+<HTML>
+<HEAD>
+<TITLE>GSECARS Imaging Software</TITLE>
+</HEAD>
+<BODY>
+<H1>GSECARS Imaging Software</H1>
+
+This document describes the GSECARS-developed IDL software used for 2-D and 3-D
+image display. 
+
+All are described in the 
+  <A HREF="imaging_routines.html">detailed documentation</A> for this package.
+<P>
+<UL>
+  <LI><A HREF="imaging_routines.html#IMAGE_DISPLAY">image_display.pro</A> is a
+      general purpose 2-D and 3-D image display tool.  It can be used to display slices in
+      through 3-D data sets.  It uses the IDL Image and Plot graphics objects.
+      It is itself an IDL object that can be controlled from other routines.</LI>
+  <LI><A HREF="imaging_routines.html#VOLUME_RENDER">volume_render.pro</A> is a
+      GUI-based 3-D volume rendering tool.  It permits setting cutting planes,
+      modifying color and opacity tables, etc.</LI>
+  <LI><A HREF="imaging_routines.html#MAKE_MOVIE">make_movie.pro</A> is a
+      procedure for displaying slices through 3-D data as a movie on the screen or to writing it to a
+      disk file as an MP4 file, or as a series of TIFF or JPEG files.</LI>
+  <LI><A HREF="imaging_routines.html#EPICS_AD_DISPLAY">epics_ad_display.pro</A> is a
+      procedure for displaying 2-D data from an EPICS areaDetector::NDStdArrays object, using 
+      TV or image_display.</LI>
+</UL>
+</BODY>
+</HTML>
+
