@@ -11,7 +11,7 @@ pro image_display::write_output_file, outfile=outfile, output_width=output_width
   self.image_window.image_obj->save, outfile, width=output_width
   return
 end
-;
+
 ;------------------
 pro image_display::plot_profiles, x_mouse, y_mouse
 
@@ -106,7 +106,7 @@ pro image_display::select_slice, slice, data, title
   endcase
   widget_control, self.widgets.slice_number, set_value=strtrim(slice,2)
 end
-
+
 pro image_display::update_image
 
   ; Set the min/max intensity
@@ -122,7 +122,41 @@ pro image_display::update_image
 
 end
 
-
+;+
+; NAME:
+;  IMAGE_DISPLAY::SET_IMAGE_DATA
+;
+; PURPOSE:
+;   This procedure is used to display a new 2-D slice.
+;   It should only be called when the data is the same dimensions as the data
+;   passed when the IMAGE_DISPLAY object was created, or when IMAGE_DISPLAY::NEW_IMAGE was called.
+;
+; CALLING SEQUENCE:
+;   IMAGE_DISPLAY::SET_IMAGE_DATA, DATA, TITLE=TITLE, MIN=MIN, MAX=MAX
+;
+; INPUTS:
+;   DATA: The 2-D image to display. It must have the same dimensions as the currently displayed image.
+;  
+; KEYWORD PARAMETERS
+;   TITLE:
+;     The title to be displayed on the top of the main IMAGE_DISPLAY window.
+;     Default: 'IDL Image Display'
+;
+;   MIN:
+;     The minimum intensity to be displayed.  Values less than this are displayed as the first color table entry.
+;     Default: current minimum display intensity is not changed.
+;
+;   MAX:
+;     The maximum intensity to be displayed.  Values greater than this are displayed as the last color table entry.
+;     Default: current maximum display intensity is not changed.
+;
+; PROCEDURE:
+;   - Updates the actual min and max intensity widgets.
+;   - Sets the displayed min and max values if specified
+;   - Updates the displayed image
+;   - Calls IMAGE_DISPLAY::PLOT_PROFILES to update the row and column profile plots
+;-
+
 pro image_display::set_image_data, data, title=title, min=min, max=max
 
   if (n_elements(title) eq 0) then title = 'IDL Image Display'
@@ -152,81 +186,54 @@ pro image_display::set_image_data, data, title=title, min=min, max=max
   self->plot_profiles
 end
 
+;+
+; NAME:
+;   IMAGE_DISPLAY::NEW_IMAGE
+;
+; PURPOSE:
+;   This routine displays a new image in an existing image_display object.
+;
+; CALLING SEQUENCE:
+;   IMAGE_DISPLAY::NEW_IMAGE, DATA, XDIST=XDIST, YDIST=YDIST,  MIN=MIN, MAX=MAX, TITLE=TITLE, ORDER=ORDER
+;
+; INPUTS:
+;   DATA: The 2-D image to display. It must have the same dimensions as the currently displayed image.
+;
+; KEYWORD PARAMETERS:
+;   XDIST:
+;     An array containing the user units ("distance") of the X axis pixels.  Dimensions must be same as xsize of DATA.
+;     Default: Pixel number in X direction.
+;
+;   YDIST:
+;     An array containing the user units ("distance") of the Y axis pixels.  Dimensions must be same as ysize of DATA.
+;     Default: Pixel number in Y direction.
+;
+;   MIN:
+;     The minimum display intensity.  Default=min(Data).
+;
+;   MAX:
+;     The maximum display intensity.  Default=max(Data).
+;
+;   TITLE:
+;     The title to be displayed on the top of the main IMAGE_DISPLAY window.
+;   
+;   ORDER:  
+;     The order in which to display the image.
+;       0=bottom to top
+;       1=top to bottom
+;       Default = Existing order
+;       
+; PROCEDURE:
+;   - Sets the image ORDER if specified.
+;   - Sets XDIST and YDIST to the default or specified values.
+;   - Deletes the existing IMAGE object and creates a new one.
+;   - Deletes the existing row and column PLOT objects and creates new ones.
+;   - Calls IMAGE_DISPLAY::SET_IMAGE_DATA to display the image and update the row and column profile plots
+;-
 pro image_display::new_image, data, $
                               xdist=xdist, ydist=ydist, $
                               min=min, max=max, $
                               title=title, order=order
-
-;+
-; NAME:
-;       image_display::SCALE_IMAGE
-;
-; PURPOSE:
-;       This routine displays a new image in an existing image_display object.
-;
-; CATEGORY:
-;       Imaging
-;
-; CALLING SEQUENCE:
-;       image_data->SCALE_IMAGE, Data
-;
-; INPUTS:
-;       Data:   A 2-D array to be displayed
-;
-; KEYWORD PARAMETERS:
-;       XDIST:  An array containing the user units ("distance") of the
-;               X axis pixels.  Dimensions must be same as xsize of Data.
-;
-;       YDIST:  An array containing the user units ("distance") of the
-;               Y axis pixels.  Dimensions must be same as ysize of Data.
-;
-;       MIN:    The minimum display intensity.  Default=min(Data).
-;
-;       MAX:    The maximum display intensity.  Default=max(Data).
-;
-;       ZOOM:   A scaler or 2-element (X,Y) array of integer zoom factors.
-;               Default = 1 in each direction.  ZOOM=2 will zoom 2X in both
-;               directions, ZOOM=[1,2] will zoom 1X in X, 2X in Y.
-;
-;       CENTER: The location where the center of the image should be located
-;               in the display window.
-;               The default is the center of the display window.
-;               CENTER=[200,300] will center the image at X=200, Y=300
-;
-;       NOERASE: Set this flag to not erase the window before displaying the
-;               image.  Allows multiple images to share a window.
-;
-;       INTERPOLATE:  Zoom the image by interpolation rather than replication.
-;
-;       REPLICATE: Zoom the image by replication rather than interpolation.
-;
-;       TITLE:  The title to give the display window.
-;
-;       SUBTITLE:  The subtitle to give the display window.
-;
-;       ORDER:  The order in which to display the image.
-;               0=bottom to top
-;               1=top to bottom
-;               Default = Existing order
-;
-;       LEAVE_MOUSE:  Set this keyword to not move the mouse to the center of the
-;               new image display.
-;
-;       RETAIN: Set this keyword to not reset the zoom and intensity scaling when
-;               when the new data are displayed.  This requires that the dimensions
-;               of the image be the same as the image currently displayed.
-;
-; MODIFICATION HISTORY:
-;       Written by:     Mark Rivers (3-DEC-1998)
-;       20-Nov-2007  MLR  Added ORDER and RETAIN keywords.
-;
-; EXAMPLE:
-;       IDL> a = DIST(512)
-;       IDL> obj = OBJ_NEW('image_display', a)
-;       IDL> obj->SCALE_IMAGE, a+100, /RETAIN
-;
-;-
-
 
   data = reform(data)
   ndims = size(data, /n_dimensions)
@@ -286,7 +293,7 @@ pro image_display::new_image, data, $
   self->set_image_data, data, title=title, min=min, max=max
 end
 
-
+
 pro image_display_event, event
     widget_control, event.top, get_uvalue=image_display
     image_display->event, event
@@ -375,101 +382,75 @@ pro image_display::event, event
       self->write_output_file, output_width=width
     end
 
-
     else: t = dialog_message('Unknown event')
   endcase
 end
 
-
+
 function image_display::init, data, xsize=xsize, ysize=ysize, $
                                     xdist=xdist, ydist=ydist, zdist=zdist, $
                                     min=min, max=max, $
                                     title=title, order=order
 ;+
 ; NAME:
-;       image_display::INIT
+;   IMAGE_DISPLAY::INIT
 ;
 ; PURPOSE:
-;       This function initializes an object of class image_display.  It is
-;       not called directly, but is called indirectly when a new object of
-;       class image_display is created via OBJ_NEW('image_display')
+;   This function initializes an object of class IMAGE_DISPLAY.  
+;   It is not called directly, but is called indirectly when a new object of
+;   class IMAGE_DISPLAY is created via OBJ_NEW('IMAGE_DISPLAY')
 ;
-;       The image_display object is a GUI display which provides interactive
-;       pan, zoom and scroll, live update of row and column profiles, etc.
-;
-; CATEGORY:
-;       Imaging
+;   The IMAGE_DISPLAY object is a GUI display which provides interactive
+;   pan, zoom and scroll, live update of row and column profiles, etc.
 ;
 ; CALLING SEQUENCE:
-;       obj = OBJ_NEW('image_display', Data)
+;    OBJ = OBJ_NEW('IMAGE_DISPLAY', DATA, KEYWORD=VALUE, ...)
 ;
 ; INPUTS:
-;       Data:   A 2-D array to be displayed
+;   DATA:   
+;     A 2-D or 3-D array to be displayed.  
+;     If DATA is 3-D then widgets at the bottom of the GUI are used to select the direction (to be displayed X, Y, Z),
+;     and the slice in that direction to be displayed.
 ;
 ; KEYWORD PARAMETERS:
-;       XSIZE:  The number of pixels horizontally in the image window.
-;               Default is the greater of 400 pixels or the xsize of Data.
+;   XSIZE:  
+;     The number of pixels horizontally in the image window.
+;     Default is the greater of 400 pixels or the xsize of DATA.
 ;
-;       YSIZE:  The number of pixels vertically in the image window.
-;               Default is the greater of 400 pixels or the ysize of Data.
+;   YSIZE:  
+;     The number of pixels vertically in the image window.
+;     Default is the greater of 400 pixels or the ysize of Data.
 ;
-;       XDIST:  An array containing the user units ("distance") of the
-;               X axis pixels.  Dimensions must be same as xsize of Data.
+;   XDIST:
+;     An array containing the user units ("distance") of the X axis pixels.  Dimensions must be same as X size of DATA.
+;     Default: Pixel number in X direction.
 ;
-;       YDIST:  An array containing the user units ("distance") of the
-;               Y axis pixels.  Dimensions must be same as ysize of Data.
+;   YDIST:
+;     An array containing the user units ("distance") of the Y axis pixels.  Dimensions must be same as Y size of DATA.
+;     Default: Pixel number in Y direction.
 ;
-;       MIN:    The minimum display intensity.  Default=min(Data).
+;   ZDIST:
+;     An array containing the user units ("distance") of the Z axis pixels.  Dimensions must be same as Z size of DATA.
+;     Default: Pixel number in Z direction.
+;     Only used if data is 3-D.
 ;
-;       MAX:    The maximum display intensity.  Default=max(Data).
+;   MIN:
+;     The minimum display intensity.  Default=min(DATA).
 ;
-;       TITLE:  The title to give the display window.
+;   MAX:
+;     The maximum display intensity.  Default=max(DATA).
 ;
-;       SUBTITLE:  The subtitle to give the display window.
+;   TITLE:
+;     The title to be displayed on the top of the main IMAGE_DISPLAY window.
 ;
-;       ORDER:  The order in which to display the image.
-;               0=bottom to top
-;               1=top to bottom
-;               Default = !ORDER system variable when this function is called.
+;   ORDER:
+;     The order in which to display the image.
+;       0=bottom to top
+;       1=top to bottom
+;       Default = Existing order
 ;
 ; OUTPUTS:
-;       This function returns 1 to indicate that the object was successfully
-;       created.
-;
-; EXAMPLE:
-;       IDL> a = DIST(512)
-;       IDL> obj = OBJ_NEW('image_display', a)
-;
-; MODIFICATION HISTORY:
-;       Written by:     Mark Rivers (3-DEC-1998)
-;       3-APR-1999  MLR  Fixed so that it will reform input array if it is
-;                        greater than 2-D but with some dimensions=1,
-;                        e.g. Data = intarr(100,1,100), which happens
-;                        frequently when extracting slices from 3-D data
-;       23-SEP-1999 MN   Added code to write JPEG file
-;       12-APR-2001 MLR  Added cleanup code so that the image_display object and all
-;                        pointers are free when the user closes the window.
-;       11-JUN-2001 MN   Added dropdown menu for output types (JPEG, BMP, PNG), and
-;                        added 'title' and 'subtitle' keywords which are
-;                        displayed in the window title
-;       17-JAN-2001 MLR  Delete line that called "a2f".  Line did nothing and a2f
-;                        is not needed.
-;       27-APR-2002 MLR  Added order keywords to write_jpeg and write_png so images
-;                        are correct side up.
-;                        Fixed bug in plotting vertical column profile if self.image_window.order=1, thanks
-;                        to Peter Vontobel of Swiss Light Source.
-;
-;       4-JUN-2002  MLR  Added "title" keyword to image_display::display_image
-;                        and "leave_mouse" keyword to other routines.  These
-;                        changes allow tomo_display:: to scroll though 2-D
-;                        slices in a 3-D volume quickly and easily.
-;
-;       27-APR-2006  MLR Added "tiff" output option
-;
-;       21-NOV-2007  MLR Added order keyword and order widget, no longer use !order except at startup
-;                        Added RETAIN keyword to SCALE_IMAGE, to preserve zoom, center and intensity
-;                        scaling.
-;                        Added autoscale widget for automatically scaling display range.
+;   This function returns 1 to indicate that the object was successfully created.
 ;-
 
   ndims = size(data, /n_dimensions)
@@ -693,5 +674,3 @@ pro image_display__define, data, xsize=xsize, ysize=ysize
     volume_data:      volume_data      $
   }
 end
-
-
