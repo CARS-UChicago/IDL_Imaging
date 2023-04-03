@@ -167,8 +167,6 @@ pro make_movie, vol, min=min, max=max, wait=wait, scale=scale, index=index, $
                 color=color, window=window, $
                 abort_widget=abort_widget, status_widget=status_widget
 
-
-
   if (n_elements(wait) eq 0) then wait=0
   if (n_elements(scale) eq 0) then scale=1
   if (n_elements(index) eq 0) then index=3
@@ -177,6 +175,29 @@ pro make_movie, vol, min=min, max=max, wait=wait, scale=scale, index=index, $
   if (n_elements(fps) eq 0) then fps = 30
   if (n_elements(bps) eq 0) then bps = 1e4
   if (n_elements(unscaled_tiff) eq 0) then unscaled_tiff = 0
+
+  nx = n_elements(vol[*,0,0])
+  ny = n_elements(vol[0,*,0])
+  nz = n_elements(vol[0,0,*])
+
+  case index of
+    1: begin
+      ncols=ny
+      nrows=nz
+      nframes=nx
+    end
+    2: begin
+      ncols=nx
+      nrows=nz
+      nframes=ny
+    end
+    3: begin
+      ncols=nx
+      nrows=ny
+      nframes=nz
+    end
+    else: message, 'INDEX must be in the range 1-3'
+  endcase
     
   if (n_elements(min) eq 0) then min=min(vol)
   if (n_elements(max) eq 0) then max=max(vol)
@@ -231,6 +252,7 @@ pro make_movie, vol, min=min, max=max, wait=wait, scale=scale, index=index, $
      window, window, xsize=(ncols>100), ysize=(nrows>100)
   endif
   
+  frame_index = start
   for frame=start, stop, step do begin
       case index of
           1: temp=vol[frame_index,*,*]
