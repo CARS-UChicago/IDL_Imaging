@@ -18,18 +18,17 @@ pro image_display::plot_profiles, x_mouse, y_mouse
   if (n_elements(x_mouse) eq 0) then x_mouse = self.image_window.x_size/2
   if (n_elements(y_mouse) eq 0) then y_mouse = self.image_window.y_size/2
   coords = self.image_window.image_obj->convertcoord(x_mouse, y_mouse, /device, /to_data)
-  xc = coords[0]
-  yc = coords[1]
+  xc = round(coords[0])
+  yc = round(coords[1])
   if (self.image_window.order eq 1) then yc = self.image_data.y_size - yc - 1
   xc = xc > 0 < (self.image_data.x_size-1)
   yc = yc > 0 < (self.image_data.y_size-1)
   x_user = (*self.image_data.x_dist)[xc]
   y_user = (*self.image_data.y_dist)[yc]
-  
-  widget_control, self.widgets.x_pixel, set_value = string(xc, format='(i)')
-  widget_control, self.widgets.y_pixel, set_value = string(yc, format='(i)')
-  widget_control, self.widgets.x_user, set_value = string(x_user)
-  widget_control, self.widgets.y_user, set_value = string(y_user)
+  widget_control, self.widgets.x_pixel, set_value = string(xc, format='(i8)')
+  widget_control, self.widgets.y_pixel, set_value = string(yc, format='(i8)')
+  widget_control, self.widgets.x_user, set_value = string(x_user, format='(f10.2)')
+  widget_control, self.widgets.y_user, set_value = string(y_user, format='(f10.2)')
   widget_control, self.widgets.pixel_value, set_value = string((*self.image_data.raw_data)[xc, yc])
 
   x_axis = *self.image_data.x_dist
@@ -497,12 +496,24 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
   if (n_elements(order) eq 0) then order=!order
   self.image_window.order = order
 
-  plot_height=190
+  if (!version.os eq 'linux') then begin
+    plot_height=210
+  endif else begin
+    plot_height=190
+  endelse
 
   self.widgets.base             = widget_base(column=1, /tlb_kill_request_events)
   row                           = widget_base(self.widgets.base, row=1, /align_center)
   ys = 20
   xs = 10
+  col                           = widget_base(row, column=1, /align_top, /frame)
+  row1                          = widget_base(col, row=1, /frame, /align_center)
+  col1                          = widget_base(row1, column=1, /align_center)
+  t                             = widget_label(col1, value='Display order')
+  self.widgets.order            = widget_droplist(col1, value=['Bottom to top', 'Top to bottom'])
+  col1                          = widget_base(row1, col=1, /align_center)
+  t                             = widget_label(col1, value='Zoom Mode')
+  self.widgets.zoom_mode        = widget_droplist(col1, value=['Replicate', 'Interpolate'])
   col                           = widget_base(row, column=1, /align_top, /frame)
   row1                          = widget_base(col, row=1, /align_top)
   col1                          = widget_base(row1, /column)
@@ -542,13 +553,6 @@ function image_display::init, data, xsize=xsize, ysize=ysize, $
   row                           = widget_base(self.widgets.base, row=1)
   base                          = widget_base(row, xsize=plot_height, ysize=plot_height, column=1)
   col                           = widget_base(base, column=1, /align_center)
-  row1                          = widget_base(col, row=1, /frame, /align_center)
-  col1                          = widget_base(row1, column=1, /align_center)
-  t                             = widget_label(col1, value='Display order')
-  self.widgets.order            = widget_droplist(col1, value=['Bottom to top', 'Top to bottom'])
-  col1                          = widget_base(row1, col=1, /align_center)
-  t                             = widget_label(col1, value='Zoom Mode')
-  self.widgets.zoom_mode        = widget_droplist(col1, value=['Replicate', 'Interpolate'])
   row1                          = widget_base(col, row=1, /frame, /align_center)
   self.widgets.new_color_table  = widget_button(row1, value='New color table')
   self.widgets.reset_zoom       = widget_button(row1, value='Reset zoom')
